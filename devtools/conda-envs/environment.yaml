@@ -1,4 +1,4 @@
-name: test
+name: development
 channels:
   - conda-forge
   - defaults
@@ -6,12 +6,17 @@ dependencies:
     # base
   - python>=3.9
   - pip
+  - aiohttp
   - numpy
   - scipy
   - pandas
   - geopandas
   - pygeos
   - streetpy
+
+    # developement
+  - ipykernel
+  - black
 
     # testing
   - pytest
@@ -21,3 +26,4 @@ dependencies:
     # Pip-only installs
   #- pip:
   #  - codecov
+
