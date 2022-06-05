@@ -4,4 +4,5 @@ include CODE_OF_CONDUCT.md
 include versioneer.py
 
 graft transitpy
-global-exclude *.py[cod] __pycache__ *.so
+global-exclude *.py[cod] __pycache__ *.soinclude transitpy/_version.py
+include transitpy/_version.py
