@@ -347,7 +347,6 @@ def td_from_str(t):
 
 def transfer_stop_stats(
     transfers,
-    max_reverse_wait=5,
     min_HPM="06:30",
     max_HPM="8:30",
     min_HPS="16:30",
@@ -355,16 +354,9 @@ def transfer_stop_stats(
 ):
     """
     generate transfer statistics from a transfer file
-    max_reverse_wait : maximum alternative wait time before arrival time
     """
 
     df = transfers.copy()
-
-    cond1 = df["reverse_wait"] + max_reverse_wait > 0
-    cond2 = df["reverse_wait"] + max_reverse_wait < df["wait"]
-    cond3 = df["wait"] > max_reverse_wait
-    df["max_rev_wait"] = cond1 & cond2 & cond3
-    df["max_rev_wait"] = df["max_rev_wait"].fillna(False)
 
     # time in peakhour
 
@@ -379,7 +371,6 @@ def transfer_stop_stats(
     df["transf_20"] = (df.wait > 10) & (df.wait <= 20)
 
     # convert to int to sum
-    df["max_rev_wait"] = df["max_rev_wait"].astype(int)
     df["transf_10"] = df["transf_10"].astype(int)
     df["transf_20"] = df["transf_20"].astype(int)
 
@@ -409,7 +400,6 @@ def transfer_stop_stats(
         wait_hp_out=("wait_hp", "median"),
         transf_10_out=("transf_10", sum),
         transf_20_out=("transf_20", sum),
-        rev_out=("max_rev_wait", sum),
         transfers_out=("trip_id_l", "size"),
     )
 
@@ -450,7 +440,6 @@ def transfer_stop_stats(
         wait_hp_in=("wait_hp", "median"),
         transf_10_in=("transf_10", sum),
         transf_20_in=("transf_20", sum),
-        rev_in=("max_rev_wait", sum),
         transfers_in=("trip_id_r", "size"),
     )
 
@@ -470,7 +459,6 @@ def transfer_stop_stats(
     # simplify agency, agency_nb, routes, route_nb, take out by default
     stats["transf_10"] = stats["transf_10_in"] + stats["transf_10_out"]
     stats["transf_20"] = stats["transf_20_in"] + stats["transf_20_out"]
-    stats["reverse"] = stats["rev_in"] + stats["rev_out"]
 
     # drop or rename columns
 
@@ -480,8 +468,6 @@ def transfer_stop_stats(
             "transf_10_out",
             "transf_20_in",
             "transf_20_out",
-            "rev_in",
-            "rev_out",
         ]
     )
 
@@ -497,7 +483,6 @@ def transfer_stop_stats(
         "wait_hp_out",
         "transf_10",
         "transf_20",
-        "reverse",
         "direction_id",
     ]
     stats[cols] = stats[cols].astype(int)

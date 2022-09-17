@@ -122,7 +122,7 @@ class Feed(
         if "agency_id" not in self.routes.columns:
             self.routes["agency_id"] = self.agency.agency_id.drop_duplicates().values[0]
 
-        # force order stop_times
+        # force order of stop_times
 
         self.stop_times = self.stop_times.sort_values(
             ["trip_id", "stop_sequence"], ascending=True
@@ -132,7 +132,7 @@ class Feed(
         self._expand_calendars(year)
 
         # replace stops in stations by stations
-        self.stations()
+        self._simplify_stations()
 
         # drop unused values
         self.prune_ids(step_text="unused")
@@ -461,6 +461,10 @@ class Feed(
         # drop sequence_ids from stop_times
         self.stop_times = self.stop_times.drop(columns=["sequence_id"])
 
+        # prune shape_ids
+        if self.shapes is not None:
+            self.shapes = self.shapes.loc[self.shapes.shape_id.isin(self.trips.shape_id.drop_duplicates())]
+
         # invalidate flat cache
         self._flat = None
 
@@ -566,7 +570,7 @@ class Feed(
 
         return None
 
-    def stations(self):
+    def _simplify_stations(self):
         """Replace stops in stations by station, drop entrances, generic nodes and boarding areas"""
 
         # normalize default columns

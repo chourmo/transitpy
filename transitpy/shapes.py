@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from http.client import REQUEST_HEADER_FIELDS_TOO_LARGE
 import pandas as pd
 import geopandas as gpd
 import pygeos as pg
@@ -51,7 +52,7 @@ class Shapes_functions(object):
             paths, "shape_id", accumulate=True, as_integer=True
         )
 
-        if self.shapes is None:
+        if self.shapes is None or overwrite:
             self.shapes = paths
 
         # add shape_ids to trips
@@ -95,29 +96,38 @@ class Shapes_functions(object):
             - geometry of the edge, cut at stop points
         """
 
-        n = streets.net.name
+        res = []
 
-        traj = self.modal_filter(modes=3)
-        traj = st.match_trajectories(
-            traj.shapes.set_index("shape_id")["geometry"],
-            streets,
-            weight=weight,
-            distance=distance,
-            k_nearest=k_nearest,
-            graph=street_graph,
-        )
+        traj = self.modal_filter(modes=[3, 715])
+        if len(traj.shapes)>0:
+            traj = st.match_trajectories(
+                traj.shapes.set_index("shape_id")["geometry"],
+                streets,
+                weight=weight,
+                distance=distance,
+                k_nearest=k_nearest,
+                graph=street_graph,
+            )
+            res.append(traj)
 
         traj_rail = self.modal_filter(modes=[0, 1, 2, 5, 6, 7, 11, 12])
-        traj_rail = st.match_trajectories(
-            traj.shapes.set_index("shape_id")["geometry"],
-            streets,
-            weight=weight,
-            distance=distance,
-            k_nearest=k_nearest,
-            graph=rail_graph,
-        )
+        if len(traj_rail.shapes) > 0:
+            traj_rail = st.match_trajectories(
+                traj_rail.shapes.set_index("shape_id")["geometry"],
+                rails,
+                weight=weight,
+                distance=distance,
+                k_nearest=k_nearest,
+                graph=rail_graph,
+            )
+            res.append(traj_rail)
 
-        traj = pd.concat([traj, traj_rail])
+        if len(res)==0:
+            return self
+        elif len(res)==1:
+            traj = res[0]
+        else:
+            pd.concat(res)
 
         # rename columns
         shapes = traj.drop(columns=[streets.net.name])
@@ -158,7 +168,7 @@ class Shapes_functions(object):
         ids = shapes.shape_id.drop_duplicates().values
         df = self.shapes.loc[~self.shapes.shape_id.isin(ids)]
 
-        shapes = pd.concat(shapes, df, ignore_index=True)
+        shapes = pd.concat([shapes, df], ignore_index=True)
         shapes = shapes.sort_values(
             ["shape_id", "shape_pt_sequence", "shape_dist_traveled"]
         )
