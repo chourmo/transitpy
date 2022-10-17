@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-from datetime import timedelta
 import pandas as pd
 
 from transitpy.utils import formattimedelta, simple_list
+
 
 def route_stats(feed, group_directions=False, by_hour=True, max_arrival_hour=3):
     """

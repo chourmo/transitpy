@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-import datetime
+
 import pandas as pd
 
-from spatial import pt_in_bounds
+from transitpy.spatial import pt_in_bounds
 
 
 class Filter_functions(object):

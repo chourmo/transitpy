@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
-import pandas as pd
 from datetime import timedelta
-from . import utils, spatial
+
+import pandas as pd
+
+from . import spatial, utils
+
 
 def find_transfers(
     pairs,

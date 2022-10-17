@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 
-from http.client import REQUEST_HEADER_FIELDS_TOO_LARGE
-import pandas as pd
 import geopandas as gpd
+import pandas as pd
 import pygeos as pg
 import streetpy as st
 
-from . import spatial
+from transitpy.spatial import dist_traveled, linestring_coordinates
 
 
 class Shapes_functions(object):
@@ -48,7 +47,7 @@ class Shapes_functions(object):
 
         paths = paths.set_geometry("geometry", crs=self.stops.geometry.crs)
 
-        paths["shape_dist_traveled"] = spatial.dist_traveled(
+        paths["shape_dist_traveled"] = dist_traveled(
             paths, "shape_id", accumulate=True, as_integer=True
         )
 
@@ -141,7 +140,7 @@ class Shapes_functions(object):
             )
 
         # convert geometry to multipoint and explode to single points
-        coords = spatial._linestring_coordinates(shapes.geometry, reindex=True)
+        coords = linestring_coordinates(shapes.geometry, reindex=True)
         shapes = pd.merge(
             coords,
             shapes.drop(columns=shapes.geometry.name).reset_index(),

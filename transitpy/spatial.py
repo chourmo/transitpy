@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
-import geopandas as gpd
 import pygeos as pg
-
 import scipy.spatial as sp
-
 
 # ------------------------------------------------------------------------------
 # spatial functions
@@ -53,7 +51,7 @@ def pt_in_bounds(points, bounds, buffer=0):
     return points.cx[xmin:xmax, ymin:ymax]
 
 
-def _linestring_coordinates(geometry, reindex=False):
+def linestring_coordinates(geometry, reindex=False):
     """
     Returns a dataframe of coordinates
     if reindex, index are integers starting at 0

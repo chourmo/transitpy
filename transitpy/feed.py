@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 import os
 import zipfile
-import datetime
 
-import pandas as pd
 import geopandas as gpd
+import pandas as pd
 from pandas.api.types import is_string_dtype
 
-from . import filters, shapes, normalize
-from .config import gtfs_def
+from transitpy.config import gtfs_def
+from transitpy.filters import Filter_functions
+from transitpy.normalize import Normalize_functions
+from transitpy.shapes import Shapes_functions
 
 
 def is_gtfs_data(path, gtfs_def=gtfs_def):
@@ -38,8 +39,7 @@ def is_gtfs_data(path, gtfs_def=gtfs_def):
     return True
 
 
-class Feed(
-    normalize.Normalize_functions, filters.Filter_functions, shapes.Shapes_functions
+class Feed(Normalize_functions, Filter_functions, Shapes_functions
 ):
     """
 
@@ -109,7 +109,10 @@ class Feed(
 
         # open files
         for f, v in gtfs_def.full.items():
-            self._open_file(path, f, is_zip=is_zip, gtfs_def=v)
+            try:
+                self._open_file(path, f, is_zip=is_zip, gtfs_def=v)
+            except:
+                print(path, v)
 
         self.stops = self.stops.to_crs(crs)
         if self.shapes is not None:

@@ -6,8 +6,7 @@ import numpy as np
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
 
-from . import utils
-from . import spatial
+from . import spatial, utils
 from .config import defaults
 
 
