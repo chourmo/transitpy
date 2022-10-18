@@ -1,23 +1,22 @@
 # -*- coding: utf-8 -*-
 import os
 import zipfile
+from doctest import DocFileCase
 
 import geopandas as gpd
 import pandas as pd
 from pandas.api.types import is_string_dtype
 
-from transitpy.config import gtfs_def
+from transitpy.config.gtfs_def import (gtfs_all_files, gtfs_extra_files,
+                                       gtfs_optional_files,
+                                       gtfs_required_files)
 from transitpy.filters import Filter_functions
 from transitpy.normalize import Normalize_functions
 from transitpy.shapes import Shapes_functions
 
 
-def is_gtfs_data(path, gtfs_def=gtfs_def):
-    """
-    return True if path has all necessary files for GTFS
-    path can be a GTFS file or a GTFS directory
-    gtfs_def is from gtfs_def.py
-    """
+def is_gtfs_path(path):
+    """ test if path has all necessary files for GTFS """
     if zipfile.is_zipfile(path):
         with zipfile.ZipFile(path, "r") as zipObj:
             files = set([os.path.basename(x) for x in zipObj.namelist()])
@@ -26,10 +25,10 @@ def is_gtfs_data(path, gtfs_def=gtfs_def):
     else:
         return False
 
-    # test files content to match gtfs_def
-    gtfs_files = set([x for x, v in gtfs_def.base.items() if not v["optional"]])
+    # test files content to match GTFS specification
+    required_files = set(gtfs_required_files().keys())
 
-    if not gtfs_files.issubset(files):
+    if not required_files.issubset(files):
         return False
 
     # check that calendar or calendar_dates exists
@@ -87,15 +86,14 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
         self.name = None
 
         if path is None:
-            for f, v in gtfs_def.full.items():
-                setattr(self, f[:-4], None)
+            self._open_empty()
             return None
 
         if not os.path.exists(path):
             raise ValueError("{0} doesnt exist".format(path))
 
         # check path is a valid GTFS file or directory
-        if not is_gtfs_data(path, gtfs_def):
+        if not is_gtfs_path(path):
             raise ValueError("{0} file is not valid GTFS data".format(self.name))
 
         # set feed name and change path if zip
@@ -108,34 +106,31 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
             self.name = os.path.splitext(os.path.basename(path))[0]
 
         # open files
-        for f, v in gtfs_def.full.items():
-            try:
-                self._open_file(path, f, is_zip=is_zip, gtfs_def=v)
-            except:
-                print(path, v)
-
-        self.stops = self.stops.to_crs(crs)
-        if self.shapes is not None:
-            self.shapes = self.shapes.to_crs(crs)
-
-        # set a value to agency_id if missing
-        if "agency_id" not in self.agency.columns:
-            self.agency["agency_id"] = 1
-            self.routes["agency_id"] = 1
-        if "agency_id" not in self.routes.columns:
-            self.routes["agency_id"] = self.agency.agency_id.drop_duplicates().values[0]
-
-        # force order of stop_times
-
+        for file_name, spec in gtfs_all_files().items():
+            df = self._open_file(path, file_name, is_zip, spec)
+            
+            # set geometries
+            if file_name == "stops.txt" and df is not None:
+                df = self._stop_geometries(df, crs=3944)
+            elif file_name == "shapes.txt" and df is not None:
+                df = self._shape_geometries(df, crs=3944)
+            
+            # store as attribute
+            setattr(self, file_name[:-4], df)
+                 
+        # set default value to agency_id
+        self.default_agencyid()
+        
+        # force stop_times order
         self.stop_times = self.stop_times.sort_values(
             ["trip_id", "stop_sequence"], ascending=True
         ).reset_index(drop=True)
 
         # normalize calendars
-        self._expand_calendars(year)
+        self.merge_calendars(year)
 
         # replace stops in stations by stations
-        self._simplify_stations()
+        self.simplify_stations()
 
         # drop unused values
         self.prune_ids(step_text="unused")
@@ -144,72 +139,107 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
 
         return None
 
-    def _open_file(self, path, file, is_zip, gtfs_def):
-        """
-        open a gtfs file, return None if file is missing
-        """
+    def _open_empty(self):
+        """ Fill attributes as None"""
+        self._flat = None
+        for file_name in gtfs_required_files().keys():
+            setattr(self, file_name[:-4], None)
+        return None
 
-        uid = gtfs_def.get("uid", "")
-        rid = gtfs_def.get("rid", [])
-        oid = gtfs_def.get("oid", [])
-        dates = gtfs_def.get("dates")
-        timedelta = gtfs_def.get("timedelta")
-        geometry = gtfs_def.get("geometry")
-        optional = gtfs_def.get("optional")
-        default_uid = gtfs_def.get("uid_default", "")
+    def _column_dtypes(self, path, spec):
 
-        requ_cols = gtfs_def.get("requ_cols", [])
-        opt_cols = gtfs_def.get("opt_cols", [])
+        header = set(pd.read_csv(path, nrows=0))
+        dtypes = {k: v for k, v in spec["required"].items()}
+        req_set = set(dtypes.keys())
 
-        dtypes = {x: "str" for x in [uid] + rid + oid}
+        # check required columns
+        if not req_set.issubset(header):
+            raise ValueError("Invalid GTFS : required columns are missing from {0}".format(path))
 
+        if "optional" in spec:
+            for k, v in spec["optional"].items():
+                if k in header:
+                    dtypes[k] = v
+
+        return dtypes
+
+
+    def _stop_geometries(self, stops, crs=None):
+        """Remove stop types without geometries, convert to GeoDataframe"""
+
+        # normalize default columns
+        if not "location_type" in stops.columns:
+            stops["location_type"] = 0
+        stops["location_type"] = stops["location_type"].fillna(0)
+        if "parent_station" not in stops.columns:
+            stops["parent_station"] = "no"
+
+        # keep stops and stations only
+        stops = stops.loc[stops.location_type < 2]
+
+        # all coordinates must be set for stops and stations
+        if len(stops.loc[stops.stop_lon.isna()]) > 0:
+            raise ValueError("Invalid GTFS : All stop coordinates must be set for stops.txt")
+
+        # set geometry
+        stops["geometry"] = gpd.points_from_xy(stops["stop_lon"], stops["stop_lat"], crs=4326)
+        stops = stops.set_geometry("geometry")
+
+        if crs is not None:
+            stops = stops.to_crs(crs)
+
+        return stops
+
+
+    def _shape_geometries(self, shapes, crs=None):
+        """Remove stop types without geometries, convert to GeoDataframe"""
+
+        shapes["geometry"] = gpd.points_from_xy(
+            shapes["shape_pt_lon"], shapes["shape_pt_lat"], crs=4326
+        )
+        return shapes
+
+
+    def _open_file(self, path, file, is_zip, spec):
+        """Open a file according to spec and add to self, return None"""
+
+        # check if file exists, otherwise set object attribute to None and return
         if is_zip:
             f_list = {os.path.basename(x): x for x in path.namelist()}
             if file in f_list:
                 f = path.open(f_list[file])
+                dtypes = self._column_dtypes(f, spec)
+                f = path.open(f_list[file])           # reopen file
             else:
-                setattr(self, file[:-4], None)
                 return None
 
         elif os.path.exists(os.path.join(path, file)):
             f = os.path.join(path, file)
+            dtypes = self._column_dtypes(f, spec)
         else:
-            setattr(self, file[:-4], None)
             return None
 
-        df = pd.read_csv(f, dtype=dtypes, parse_dates=dates, encoding="utf-8")
+        df = pd.read_csv(
+            f,
+            dtype=dtypes,
+            usecols=list(dtypes.keys()),
+            parse_dates=spec.get("dates", []),
+            encoding="utf-8",
+            infer_datetime_format=True,
+        )
 
-        cols = df.columns.intersection(requ_cols + opt_cols)
-        df = df[cols]
+        # fix missing or duplicated uid
+        if "uid" in spec:
+            if spec["uid"] not in df.columns:
+                df[spec["uid"]] = df[spec["name"]].copy()
+            df = df.drop_duplicates(subset=spec["uid"])
 
-        if uid != "" and uid not in df.columns:
-            df[uid] = default_uid
+        # convert timedelta columns
+        if "timedelta" in spec:
+            for col in spec["timedelta"]:
+                df[col] = pd.to_timedelta(df[col])
 
-        if uid != "":
-            df = df.drop_duplicates(subset=uid)
-
-        if type(timedelta) is list:
-            for c in timedelta:
-                df[c] = pd.to_timedelta(df[c])
-
-        elif type(timedelta) is str:
-            df[timedelta] = pd.to_timedelta(df[timedelta])
-
-        if type(geometry) is list:
-
-            x, y = geometry[0], geometry[1]
-            df_g = df.loc[(~df[x].isna()) & (~df[y].isna())]
-            df.loc[df_g.index, "geometry"] = gpd.GeoSeries(
-                gpd.points_from_xy(df_g[x], df_g[y], crs=4326), index=df_g.index
-            )
-            df = df.set_geometry("geometry")
-
-        if (df.shape[0] == 0) and (not optional):
-            raise ValueError("File {0} is empty".format(f))
-        else:
-            setattr(self, file[:-4], df)
-
-        return None
+        return df
 
     def to_feed(self, path, compress=False, csv_separator=","):
         """Save feed by feed name to path, may compress as zip folder"""
@@ -219,7 +249,7 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
             dest_path = os.path.join(path, self.name + ".zip")
 
             with zipfile.ZipFile(dest_path, "w") as csv_zip:
-                for f, v in gtfs_def.full.items():
+                for f, v in gtfs_all_files().items():
 
                     df = None
 
@@ -239,7 +269,7 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
 
             os.mkdir(dest_path)
 
-            for f, v in gtfs_def.full.items():
+            for f, v in gtfs_all_files().items():
 
                 df = None
 
@@ -474,29 +504,20 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
         return None
 
     # -------------------------------------------------------------------------
-    # minimal cleaning and normalizations of calendars and stop parent stations
+    # minimal normalization of dataframes
+    
+    def default_agencyid(self):
+        """add an agency_id and drop duplicates if missing column"""
 
-    def unified_calendars(self, trips=False):
-        """
-        returns a DataFrame with service_id and pd.datetime.date of one day as value
-        if trips is True, add number of trips in a trips column
-        """
-        if self.calendar is not None:
-            raise ValueError("unified calendars needs feed nomalization")
+        if "agency_id" in self.agency.columns:
+            return None
 
-        df = self.calendar_dates.copy()
-        del df["exception_type"]
+        self.agency["agency_id"] = self.agency["agency_name"].copy()
+        return None
 
-        if trips:
-            trips = self.trips.drop_duplicates(["trip_id", "service_id"])
-            trips = trips.groupby(["service_id"]).size().to_frame("trips")
-            df = pd.merge(df, trips, on=["service_id"], how="left")
-
-        return df.drop_duplicates(subset=["service_id", "date"]).reset_index(drop=True)
-
-    def _expand_calendars(self, year):
-        """Add calendar values to calendar_dates, calendar attribute is set to None"""
-
+    def merge_calendars(self, year):
+        """Calendar data is unified in calendar_dates"""
+        
         self._drop_invalid_calendar_dates()
 
         if self.calendar is None:
@@ -529,18 +550,16 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
         for d in days:
             df = df.loc[(df.day != d) | (df[d] == 1)]
 
-        df = df[["service_id", "date"]]
+        df = df[["service_id", "date"]].copy()
 
         # merge calendar_dates
         if self.calendar_dates is not None:
             df = pd.merge(
                 df, self.calendar_dates, on=["service_id", "date"], how="outer"
             )
-
+            df['exception_type'] = df['exception_type'].fillna(1)
             df = df.loc[df.exception_type != 2]
-            del df["exception_type"]
 
-        df["exception_type"] = 1
         self.calendar_dates = df.copy()
         self.calendar = None
 
@@ -573,7 +592,7 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
 
         return None
 
-    def _simplify_stations(self):
+    def simplify_stations(self):
         """Replace stops in stations by station, drop entrances, generic nodes and boarding areas"""
 
         # normalize default columns
@@ -747,11 +766,28 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
 
     # --------------------------------------------------------------
     # utilities
+    
+    def trips_by_date(self):
+        """
+        returns a DataFrame with service_id and pd.datetime.date of one day as value
+        if trips is True, add number of trips in a trips column
+        """
+        if self.calendar is not None:
+            raise ValueError("unified calendars needs feed nomalization")
 
+        df = self.calendar_dates.copy()
+        del df["exception_type"]
+        
+        trips = self.trips.drop_duplicates(["trip_id", "service_id"])
+        trips = trips.groupby(["service_id"]).size().to_frame("trips")
+        df = pd.merge(df, trips, on=["service_id"], how="left")
+
+        return df.drop_duplicates(subset=["service_id", "date"]).reset_index(drop=True)
+    
     def valid_weeks(self):
         """return a list (week, year) with service"""
 
-        df = self.unified_calendars(trips=True)
+        df = self.trips_by_date()
         df["week"] = df.date.dt.isocalendar().week
         df["year"] = df.date.dt.year
         df = df.groupby(["year", "week"])["trips"].sum()
@@ -762,7 +798,7 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
         return sum(
             [
                 getattr(self, x[:-4]).shape[0]
-                for x in gtfs_def.full.keys()
+                for x in gtfs_all_files().keys()
                 if getattr(self, x[:-4]) is not None
             ]
         )
@@ -770,7 +806,7 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
     def description(self):
 
         description = {}
-        for k in gtfs_def.full.keys():
+        for k in gtfs_all_files().keys():
             df = getattr(self, k[:-4])
             if df is not None:
                 description[k[:-4]] = df.shape[0]

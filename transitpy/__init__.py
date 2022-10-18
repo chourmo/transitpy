@@ -4,7 +4,7 @@
 # Handle versioneer
 from ._version import get_versions
 from .datasource.PAN import PAN_Datasource
-from .feed import Feed, is_gtfs_data
+from .feed import Feed, is_gtfs_path
 from .spatial import match_to_grid
 from .statistics import (route_stats, stop_stats, transfer_route_stats,
                          transfer_stop_stats)

@@ -132,7 +132,7 @@ class Filter_functions(object):
         fd = self.copy()
 
         # days of each calendar_dates
-        df = fd.unified_calendars(trips=True)
+        df = fd.trips_by_date()
 
         # filter to specific day, capitalize to match string format
         df = df.loc[df.date.dt.weekday == day]

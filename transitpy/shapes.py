@@ -57,7 +57,7 @@ class Shapes_functions(object):
         # add shape_ids to trips
 
         self.trips = self.trips.set_index("trip_id")
-        self.trips.loc[df.index, "shape_id"] = df["shape_id"]
+        self.trips["shape_id"] = df["shape_id"].copy()
         self.trips = self.trips.reset_index()
 
         return None
@@ -154,7 +154,7 @@ class Shapes_functions(object):
         )
 
         shapes = shapes.reset_index(drop=True)
-        shapes["shape_dist_traveled"] = spatial.dist_traveled(
+        shapes["shape_dist_traveled"] = dist_traveled(
             shapes, "shape_id", accumulate=True, as_integer=True
         )
 
