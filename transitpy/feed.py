@@ -111,9 +111,9 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
             
             # set geometries
             if file_name == "stops.txt" and df is not None:
-                df = self._stop_geometries(df, crs=3944)
+                df = self._stop_geometries(df, crs=crs)
             elif file_name == "shapes.txt" and df is not None:
-                df = self._shape_geometries(df, crs=3944)
+                df = self._shape_geometries(df, crs=crs)
             
             # store as attribute
             setattr(self, file_name[:-4], df)
@@ -183,7 +183,7 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
 
         # set geometry
         stops["geometry"] = gpd.points_from_xy(stops["stop_lon"], stops["stop_lat"], crs=4326)
-        stops = stops.set_geometry("geometry")
+        stops = stops.set_geometry("geometry", crs=4326)
 
         if crs is not None:
             stops = stops.to_crs(crs)
@@ -197,6 +197,7 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
         shapes["geometry"] = gpd.points_from_xy(
             shapes["shape_pt_lon"], shapes["shape_pt_lat"], crs=4326
         )
+        shapes = shapes.set_geometry("geometry", crs=4326)
         return shapes
 
 

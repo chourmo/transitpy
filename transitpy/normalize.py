@@ -387,26 +387,26 @@ class Normalize_functions(object):
 
         # first stop, delete one minute
         self.stop_times.loc[
-            (self.stop_times.trip_id != self.stop_times.shift(1).trip_id)
+            (self.stop_times.trip_id != self.stop_times.trip_id.shift(1))
             & (self.stop_times.arrival_time.isna()),
             "arrival_time",
         ] = self.stop_times.arrival_time - pd.Timedelta(seconds=60)
 
         self.stop_times.loc[
-            (self.stop_times.trip_id != self.stop_times.shift(1).trip_id)
+            (self.stop_times.trip_id != self.stop_times.trip_id.shift(1))
             & (self.stop_times.departure_time.isna()),
             "departure_time",
         ] = self.stop_times.departure_time - pd.Timedelta(seconds=60)
 
         # last stop, add one minute
         self.stop_times.loc[
-            (self.stop_times.trip_id != self.stop_times.shift(-1).trip_id)
+            (self.stop_times.trip_id != self.stop_times.trip_id.shift(-1))
             & (self.stop_times.arrival_time.isna()),
             "arrival_time",
         ] = self.stop_times.arrival_time + pd.Timedelta(seconds=60)
 
         self.stop_times.loc[
-            (self.stop_times.trip_id != self.stop_times.shift(-1).trip_id)
+            (self.stop_times.trip_id != self.stop_times.trip_id.shift(-1))
             & (self.stop_times.departure_time.isna()),
             "departure_time",
         ] = self.stop_times.departure_time + pd.Timedelta(seconds=60)
@@ -517,7 +517,7 @@ class Normalize_functions(object):
             df["departure_time"].iloc[1:].dt.seconds
             - df["arrival_time"].shift(1).iloc[1:].dt.seconds
         )
-        df.loc[df.trip_id != df.shift(1).trip_id, "time"] = 0
+        df.loc[df.trip_id != df.trip_id.shift(1), "time"] = 0
         df["time"] = df["time"].fillna(60).div(60).clip(lower=1)
         df = df.eval("speed = 60 * dist / (time * 1000)")
 

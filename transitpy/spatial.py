@@ -82,10 +82,9 @@ def dist_traveled(geom, group, accumulate=False, as_integer=True):
     g = geom.geometry.name
     df = geom.copy()
 
-    df_s = df[g].shift(1).iloc[1:]
-    df_s.crs = geom.crs
+    shifted = _geo_shift(df, 1)
 
-    df["_distance"] = df.iloc[1:][g].distance(df_s)
+    df["_distance"] = df.iloc[1:][g].distance(shifted[g])
 
     df.loc[(df[group] != df[group].shift(1)), "_distance"] = 0
     if as_integer:
@@ -157,8 +156,8 @@ def query_pairs(
         df.add_suffix(right_suffix), left_on=ix_r, right_index=True, how="left"
     )
 
-    pairs = pairs.set_geometry(geom_l)
-    pairs["distance"] = pairs[geom_l].distance(pairs[[geom_r]].set_geometry(geom_r))
+    pairs = pairs.set_geometry(geom_l, crs=points.crs)
+    pairs["distance"] = pairs[geom_l].distance(pairs[[geom_r]].set_geometry(geom_r, crs=points.crs))
 
     if line:
         pairs["geometry"] = pg.shortest_line(
@@ -225,13 +224,13 @@ def match_to_grid(feed, grid, distance, min_default=True):
         raise ValueError("distance must be a numeric or a dictionary")
 
     df["_buffer"] = df["stop_geom"].centroid.buffer(dist)
-    df = df.set_geometry("_buffer")
+    df = df.set_geometry("_buffer", crs=feed.projected_crs)
 
     # create grid centroid
     df_grid = grid.to_crs(epsg=feed.projected_crs)
     df_grid = df_grid.rename_geometry("_gridgeom")
     df_grid["_centgeom"] = df_grid.centroid
-    df_grid = df_grid.set_geometry("_centgeom")
+    df_grid = df_grid.set_geometry("_centgeom", crs=feed.projected_crs)
 
     df = gpd.sjoin(df, df_grid, predicate="intersects")
     df["dist"] = df["stop_geom"].distance(df["_gridgeom"].centroid)
@@ -247,6 +246,16 @@ def match_to_grid(feed, grid, distance, min_default=True):
         gr_name = grid.index.name
 
     df = df.rename(columns={"index_right": gr_name, "_gridgeom": grid.geometry.name})
-    df = df.set_geometry(grid.geometry.name)
+    df = df.set_geometry(grid.geometry.name, crs=feed.projected_crs)
 
     return df.drop(columns=["stop_geom", "_buffer"])
+
+
+def _geo_shift(gdf, shift_value):
+    # shift is bugged in geopandas, lost crs
+    
+    #df_s = df[g].shift(shift_value).iloc[shift_value:]
+    shifted = gdf.iloc[:-shift_value]
+    shifted.index = gdf.index[shift_value:]
+
+    return shifted

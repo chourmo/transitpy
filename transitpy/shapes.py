@@ -5,7 +5,7 @@ import pandas as pd
 import pygeos as pg
 import streetpy as st
 
-from transitpy.spatial import dist_traveled, linestring_coordinates
+from .spatial import dist_traveled, linestring_coordinates
 
 
 class Shapes_functions(object):
@@ -98,6 +98,7 @@ class Shapes_functions(object):
         res = []
 
         traj = self.modal_filter(modes=[3, 715])
+
         if len(traj.shapes)>0:
             traj = st.match_trajectories(
                 traj.shapes.set_index("shape_id")["geometry"],
@@ -158,10 +159,10 @@ class Shapes_functions(object):
             shapes, "shape_id", accumulate=True, as_integer=True
         )
 
-        shapes = shapes.to_crs(4326)
-        shapes["shape_pt_lon"] = shapes.geometry.x
-        shapes["shape_pt_lat"] = shapes.geometry.y
-        shapes = shapes.drop(columns=[shapes.geometry.name, "x", "y"])
+        WGS_geom = shapes.geometry.to_crs(4326)
+        shapes["shape_pt_lon"] = WGS_geom.x
+        shapes["shape_pt_lat"] = WGS_geom.y
+        shapes = shapes.drop(columns=["x", "y"])
 
         # add not projected shapes
         ids = shapes.shape_id.drop_duplicates().values
