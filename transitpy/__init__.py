@@ -5,7 +5,7 @@
 from ._version import get_versions
 from .datasource.PAN import PAN_Datasource
 from .feed import Feed, is_gtfs_path
-from .spatial import match_to_grid
+from .spatial import match_to_grid, feed_geometries
 from .statistics import (route_stats, stop_stats, transfer_route_stats,
                          transfer_stop_stats)
 from .transfers import make_transfers

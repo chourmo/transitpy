@@ -3,35 +3,31 @@
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-import pygeos as pg
+import shapely as sh
 import scipy.spatial as sp
+
+from transitpy.utils import format_timedelta
 
 # ------------------------------------------------------------------------------
 # spatial functions
 
+def feed_geometries(feed):
+    shapes = feed.trips.drop_duplicates('shape_id')[['route_id', 'shape_id', "direction_id"]]
+    shape_geom = feed.shape_geometries().to_frame('geometry')
+    shape_geom['length'] = shape_geom.geometry.length
 
-def _as_geometry_array(geometry):
-    """Convert geometry into a numpy array of PyGEOS geometries.
+    shapes = pd.merge(shape_geom, shapes, left_index=True, right_on='shape_id', how='left')
 
-    Args :
-    geometry
-        An array-like of PyGEOS geometries
-        or a GeoPandas GeoSeries/GeometryArray.
-    """
+    shapes = pd.merge(shapes, feed.routes[['route_id', 'agency_id', 'route_type']], on='route_id', how='left')
 
-    if isinstance(geometry, np.ndarray):
-        return geometry
-    elif isinstance(geometry, gpd.GeoSeries):
-        return geometry.values.data
-    elif isinstance(geometry, np.array.GeometryArray):
-        return geometry.data
-    else:
-        return np.asarray(geometry)
+    shapes = pd.merge(shapes, feed.agency[['agency_name', 'agency_id']], on='agency_id', how='left')
+    shapes = shapes.drop(columns=['agency_id', 'route_id']).set_index('shape_id')
 
+    return shapes
 
 def linemerge(gdf):
-    geom = pg.multilinestrings(_as_geometry_array(gdf), indices=gdf.index.to_numpy())
-    geom = pg.line_merge(geom)
+    geom = sh.multilinestrings(gdf.values.data, indices=gdf.index.to_numpy())
+    geom = sh.line_merge(geom)
     index = gdf.index.drop_duplicates()
     return gpd.GeoSeries(data=geom, index=index, crs=gdf.crs)
 
@@ -58,8 +54,7 @@ def linestring_coordinates(geometry, reindex=False):
     else, index is same as geometry index
     """
 
-    g = _as_geometry_array(geometry)
-    coords, coords_index = pg.coordinates.get_coordinates(g, return_index=True)
+    coords, coords_index = sh.get_coordinates(geometry.values.data, return_index=True)
     pts = pd.DataFrame(data=coords, index=coords_index, columns=["x", "y"])
 
     if not reindex:
@@ -67,6 +62,13 @@ def linestring_coordinates(geometry, reindex=False):
         pts.index = pts.index.map(mapper)
 
     return pts
+
+def _shape_linestrings(x, y, indices):
+    
+    # indices mays not be valid
+    valid_indices = _simple_ix(indices)
+    
+    return sh.linestrings(coords=x, y=y, indices=valid_indices)
 
 
 def dist_traveled(geom, group, accumulate=False, as_integer=True):
@@ -160,9 +162,8 @@ def query_pairs(
     pairs["distance"] = pairs[geom_l].distance(pairs[[geom_r]].set_geometry(geom_r, crs=points.crs))
 
     if line:
-        pairs["geometry"] = pg.shortest_line(
-            _as_geometry_array(pairs[geom_l]),
-            _as_geometry_array(pairs[geom_r]),
+        pairs["geometry"] = sh.shortest_line(pairs[geom_l].values.data,
+                                             pairs[geom_r].values.data,
         )
         pairs = pairs.set_geometry("geometry")
 
@@ -203,10 +204,16 @@ def match_to_grid(feed, grid, distance, min_default=True):
             trips=("trip_id", "size"),
             stop_geom=("geometry", "first"),
             time=("time", "max"),
+            start=('departure_time', 'min'),
+            end=('arrival_time', 'max'),
         )
         .reset_index()
     )
     df = df.set_geometry("stop_geom", crs=feed.projected_crs)
+
+    # format timedelta to simple HH:MM text
+    df['start'] = format_timedelta(df['start'])
+    df['end'] = format_timedelta(df['end'])
 
     # spatial join on full feed : stop ids may change between trips
     # TODO : groupby trips with same sequence of stop ids
@@ -259,3 +266,13 @@ def _geo_shift(gdf, shift_value):
     shifted.index = gdf.index[shift_value:]
 
     return shifted
+
+def _simple_ix(df):
+    """Create an integer array from 0, value changes on array value change"""
+
+    array = df.to_numpy()
+    if array.shape[0] < 2:
+        return np.array([0])
+    int_ix = array[1:] != array[:-1]
+    int_ix = np.concatenate([np.array([False]), int_ix], axis=0)
+    return np.cumsum(int_ix)

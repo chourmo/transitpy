@@ -158,7 +158,7 @@ class PAN_Datasource(Datasource):
         )["_c"]
 
         df["_upper_dataset"] = comparable_string(df["dataset_title"])
-        df["_min_pub"] = df.groupby([dup_name, "_upper_dataset"])["_pub"].transform(min)
+        df["_min_pub"] = df.groupby([dup_name, "_upper_dataset"])["_pub"].transform("min")
 
         self.data = df.loc[df._pub == df._min_pub].drop(
             columns=["publisher_name", "_pub", "_min_pub", "_upper_dataset"]
@@ -169,7 +169,7 @@ class PAN_Datasource(Datasource):
 
         df = self.data
         df["_dist"] = self._day_distance(df["start"], df["end"])
-        df["_min_dist"] = df.groupby(["name", "dataset_title"])["_dist"].transform(min)
+        df["_min_dist"] = df.groupby(["name", "dataset_title"])["_dist"].transform("min")
 
         self.data = df.loc[df._dist == df._min_dist].drop(
             columns=["_dist", "_min_dist"]

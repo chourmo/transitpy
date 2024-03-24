@@ -181,8 +181,8 @@ def make_transfers(
     )
 
     stops = df.groupby(["stop_u", "route_u", "direction_id"]).agg(
-        start=("departure_time", min),
-        end=("arrival_time", max),
+        start=("departure_time", 'min'),
+        end=("arrival_time", 'max'),
         geometry=("geometry", "first"),
         agency_name=("agency_name", "first"),
         route_type=("route_type", "first"),

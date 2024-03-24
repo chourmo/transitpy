@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import pandas as pd
 
-from transitpy.utils import formattimedelta, simple_list
+from transitpy.utils import format_timedelta, simple_list
 
 
 def route_stats(feed, group_directions=False, by_hour=True, max_arrival_hour=3):
@@ -52,9 +52,9 @@ def route_stats(feed, group_directions=False, by_hour=True, max_arrival_hour=3):
             group_name=("group_short_name", "first"),
             route_type=("route_type", "first"),
             stops=("stop_sequence", "count"),
-            departure=("departure_time", min),
-            arrival=("arrival_time", max),
-            length=("shape_dist_traveled", max),
+            departure=("departure_time", "min"),
+            arrival=("arrival_time", "max"),
+            length=("shape_dist_traveled", "max"),
             spacing=("spacing", "median"),
             wheelchair_accessible=("wheelchair_accessible", "first"),
             bikes_allowed=("bikes_allowed", "first"),
@@ -93,13 +93,13 @@ def route_stats(feed, group_directions=False, by_hour=True, max_arrival_hour=3):
             route_short_name=("route_short_name", "first"),
             route_types=("route_type", "first"),
             trips=("trip_id", "count"),
-            stops=("stops", max),
-            departure=("departure", min),
-            arrival=("arrival", max),
-            length=("length", sum),
+            stops=("stops", "max"),
+            departure=("departure", "min"),
+            arrival=("arrival", "max"),
+            length=("length", "sum"),
             spacing=("spacing", "median"),
-            wheelchair=("wheelchair_accessible", max),
-            bikes=("bikes_allowed", max),
+            wheelchair=("wheelchair_accessible", "max"),
+            bikes=("bikes_allowed", "max"),
             time=("time", "median"),
             speed=("speed", "median"),
         )
@@ -122,8 +122,8 @@ def route_stats(feed, group_directions=False, by_hour=True, max_arrival_hour=3):
     if "direction_id" in df.columns:
         df["direction_id"] = df["direction_id"].astype(int)
 
-    df["departure"] = formattimedelta(df["departure"])
-    df["arrival"] = formattimedelta(df["arrival"])
+    df["departure"] = format_timedelta(df["departure"])
+    df["arrival"] = format_timedelta(df["arrival"])
 
     return df
 
@@ -173,10 +173,10 @@ def stop_stats(feed, max_arrival_hour=3):
             stop_name=("stop_name", "first"),
             position=("stop_sequence", "mean"),
             trips=("trip_id", "count"),
-            departure=("departure_time", min),
-            arrival=("arrival", max),
-            wheelchair=("wheelchair_boarding", max),
-            bikes=("bikes_allowed", max),
+            departure=("departure_time", "min"),
+            arrival=("arrival", "max"),
+            wheelchair=("wheelchair_boarding", "max"),
+            bikes=("bikes_allowed", "max"),
             longitude=("stop_lon", "first"),
             latitude=("stop_lat", "first"),
         )
@@ -189,8 +189,8 @@ def stop_stats(feed, max_arrival_hour=3):
     df["wheelchair"] = df["wheelchair"].astype(int)
     df["bikes"] = df["bikes"].astype(int)
 
-    df["departure"] = formattimedelta(df["departure"])
-    df["arrival"] = formattimedelta(df["arrival"])
+    df["departure"] = format_timedelta(df["departure"])
+    df["arrival"] = format_timedelta(df["arrival"])
 
     if "direction_id" in df.columns:
         df["direction_id"] = df["direction_id"].astype(int)
@@ -232,8 +232,8 @@ def transfer_route_stats(transfers, max_text_length=200):
             lambda x: simple_list(x, max_text_length),
         ),
         wait_out=("wait", "median"),
-        transf_10_out=("transf_10", sum),
-        transf_20_out=("transf_20", sum),
+        transf_10_out=("transf_10", 'sum'),
+        transf_20_out=("transf_20", 'sum'),
         transfers_out=("trip_id_l", "size"),
     )
 
@@ -254,8 +254,8 @@ def transfer_route_stats(transfers, max_text_length=200):
             lambda x: simple_list(x, max_text_length),
         ),
         wait_in=("wait", "median"),
-        transf_10_in=("transf_10", sum),
-        transf_20_in=("transf_20", sum),
+        transf_10_in=("transf_10", 'sum'),
+        transf_20_in=("transf_20", 'sum'),
         transfers_in=("trip_id_r", "size"),
     )
 
@@ -398,8 +398,8 @@ def transfer_stop_stats(
     ).agg(
         wait_out=("wait", "median"),
         wait_hp_out=("wait_hp", "median"),
-        transf_10_out=("transf_10", sum),
-        transf_20_out=("transf_20", sum),
+        transf_10_out=("transf_10", 'sum'),
+        transf_20_out=("transf_20", 'sum'),
         transfers_out=("trip_id_l", "size"),
     )
 
@@ -438,8 +438,8 @@ def transfer_stop_stats(
     ).agg(
         wait_in=("wait", "median"),
         wait_hp_in=("wait_hp", "median"),
-        transf_10_in=("transf_10", sum),
-        transf_20_in=("transf_20", sum),
+        transf_10_in=("transf_10", 'sum'),
+        transf_20_in=("transf_20", 'sum'),
         transfers_in=("trip_id_r", "size"),
     )
 

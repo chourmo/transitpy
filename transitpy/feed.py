@@ -108,7 +108,7 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
         # open files
         for file_name, spec in gtfs_all_files().items():
             df = self._open_file(path, file_name, is_zip, spec)
-            
+         
             # set geometries
             if file_name == "stops.txt" and df is not None:
                 df = self._stop_geometries(df, crs=crs)
@@ -117,10 +117,10 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
             
             # store as attribute
             setattr(self, file_name[:-4], df)
-                 
+                
         # set default value to agency_id
         self.default_agencyid()
-        
+       
         # force stop_times order
         self.stop_times = self.stop_times.sort_values(
             ["trip_id", "stop_sequence"], ascending=True
@@ -218,17 +218,20 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
             f = os.path.join(path, file)
             dtypes = self._column_dtypes(f, spec)
         else:
-            return None
-
+            return None    
+       
         df = pd.read_csv(
             f,
             dtype=dtypes,
             usecols=list(dtypes.keys()),
-            parse_dates=spec.get("dates", []),
             encoding="utf-8",
-            infer_datetime_format=True,
+            dtype_backend="pyarrow"
         )
 
+        # convert dates
+        for c in spec.get("dates", []):
+            df[c] = pd.to_datetime(df[c], format="%Y%m%d")
+        
         # fix missing or duplicated uid
         if "uid" in spec:
             if spec["uid"] not in df.columns:
@@ -538,13 +541,14 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
         ]
 
         df = self.calendar.copy()
+       
         df["repeats"] = df["end_date"] - df["start_date"]
         df["repeats"] = df["repeats"].dt.days + 1
 
         df = df.reindex(index=df.index.repeat(df["repeats"]))
-        df["date"] = df["start_date"] + pd.TimedeltaIndex(
-            df.groupby("service_id").cumcount(), unit="D"
-        )
+        service_count = df.groupby("service_id").cumcount()
+        service_count = pd.to_timedelta(service_count, unit='day')
+        df["date"] = df["start_date"] + service_count
         df["day"] = df["date"].dt.day_name().str.lower()
 
         # keep only if value is 1
@@ -603,7 +607,6 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
         if "parent_station" not in self.stops.columns:
             self.stops["parent_station"] = "no"
         elif not is_string_dtype(self.stops.parent_station):
-            self.stops.parent_station = self.stops.parent_station.astype("Int64")
             self.stops.parent_station = self.stops.parent_station.astype("str")
 
         # keep stops and stations only
@@ -746,8 +749,8 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
         df["spacing"] = df["spacing"].astype(int)
 
         # first and last stop_sequence
-        df["first_seq"] = df.groupby(["trip_id"])["stop_sequence"].transform(min)
-        df["last_seq"] = df.groupby(["trip_id"])["stop_sequence"].transform(max)
+        df["first_seq"] = df.groupby(["trip_id"])["stop_sequence"].transform("min")
+        df["last_seq"] = df.groupby(["trip_id"])["stop_sequence"].transform("max")
 
         # time from first stop in trip
         start = df[["trip_id", "departure_time"]].drop_duplicates("trip_id")
@@ -777,7 +780,8 @@ class Feed(Normalize_functions, Filter_functions, Shapes_functions
             raise ValueError("unified calendars needs feed nomalization")
 
         df = self.calendar_dates.copy()
-        del df["exception_type"]
+        if df is not None and "exception_type" in df.columns:
+            del df["exception_type"]
         
         trips = self.trips.drop_duplicates(["trip_id", "service_id"])
         trips = trips.groupby(["service_id"]).size().to_frame("trips")

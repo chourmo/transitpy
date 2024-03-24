@@ -99,14 +99,14 @@ optional_files = {
             "friday": "UInt8",
             "saturday": "UInt8",
             "sunday": "UInt8",
-            "start_date": str_dtype,
-            "end_date": str_dtype,
+            "start_date": int,
+            "end_date": int,
         },
     },
     "calendar_dates.txt": {
         "oid": ["service_id"],
         "dates": ["date"],
-        "required": {"service_id": str_dtype, "date": str_dtype, "exception_type": "UInt8"},
+        "required": {"service_id": str_dtype, "date": int, "exception_type": "UInt8"},
     },
     "fare_attributes.txt": {
         "uid": "fare_id",
@@ -139,7 +139,7 @@ optional_files = {
             "shape_pt_lon": float,
             "shape_pt_sequence": "UInt16",
         },
-        "optional": {"shape_dist_traveled": "UInt32"},
+        "optional": {"shape_dist_traveled": float},
     },
     "frequencies.txt": {
         "rid": ["trip_id"],

@@ -5,7 +5,7 @@ import random
 import pandas as pd
 
 
-def formattimedelta(td):
+def format_timedelta(td):
 
     df = td.dt.components[["hours", "minutes"]]
     df["hours"] = df["hours"].map(str).str.zfill(2)

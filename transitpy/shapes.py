@@ -2,10 +2,9 @@
 
 import geopandas as gpd
 import pandas as pd
-import pygeos as pg
 import streetpy as st
 
-from .spatial import dist_traveled, linestring_coordinates
+from .spatial import dist_traveled, linestring_coordinates, _shape_linestrings
 
 
 class Shapes_functions(object):
@@ -62,7 +61,7 @@ class Shapes_functions(object):
 
         return None
 
-    def shapes_on_graph(
+    def update_shapes_on_graph(
         self,
         streets,
         rails,
@@ -125,12 +124,12 @@ class Shapes_functions(object):
         if len(res)==0:
             return self
         elif len(res)==1:
-            traj = res[0]
+            shapes = res[0]
         else:
-            pd.concat(res)
+            shapes = pd.concat(res)
 
         # rename columns
-        shapes = traj.drop(columns=[streets.net.name])
+        shapes = shapes.drop(columns=[streets.net.name], errors="ignore")
         shapes = shapes.rename(columns={"stop": "shape_pt_sequence"})
         shapes = shapes.to_crs(self.projected_crs)
 
@@ -164,7 +163,7 @@ class Shapes_functions(object):
         shapes["shape_pt_lat"] = WGS_geom.y
         shapes = shapes.drop(columns=["x", "y"])
 
-        # add not projected shapes
+        # add back not projected shapes
         ids = shapes.shape_id.drop_duplicates().values
         df = self.shapes.loc[~self.shapes.shape_id.isin(ids)]
 
@@ -181,16 +180,19 @@ class Shapes_functions(object):
         """
         returns a GeoSeries of the shape geometries, shape_id as index
         if projected_crs is True, reproject in the feed projected crs
+        return None if no shapes values
         """
 
-        df = self.shapes[["shape_id", "shape_pt_lon", "shape_pt_lat"]].copy()
-        df = df.groupby("shape_id").apply(
-            lambda x: [x["shape_pt_lon"].values, x["shape_pt_lat"].values]
-        )
+        if self.shapes is None:
+            return None
 
-        df = gpd.GeoSeries(
-            df.apply(lambda x: pg.creation.linestrings(x[0], y=x[1])), crs=4326
-        )
+        x = self.shapes['shape_pt_lon']
+        y = self.shapes['shape_pt_lat']
+        indices = self.shapes['shape_id']
+
+        shape_index = indices.drop_duplicates()
+
+        df = gpd.GeoSeries(_shape_linestrings(x, y, indices), index=shape_index, crs=4326)
 
         if projected_crs:
             df = df.to_crs(self.projected_crs)

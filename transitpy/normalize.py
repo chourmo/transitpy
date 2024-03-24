@@ -227,7 +227,7 @@ class Normalize_functions(object):
             df = df.loc[(df.stops <= 5) | (df.stop_sequence != df.max_seq)]
 
         df = df.groupby("trip_id").agg(
-            min_dep=("departure_time", min), max_arr=("arrival_time", max)
+            min_dep=("departure_time", "min"), max_arr=("arrival_time", "max")
         )
 
         if df.shape[0] > 0:
@@ -715,10 +715,10 @@ class Normalize_functions(object):
         ).agg(
             name_l=("route_short_name_l", "first"),
             name_r=("route_short_name_r", "first"),
-            trips_l=("trips_l", min),
-            trips_r=("trips_r", min),
-            route_type_l=("route_type_l", min),
-            route_type_r=("route_type_r", min),
+            trips_l=("trips_l", "min"),
+            trips_r=("trips_r", "min"),
+            route_type_l=("route_type_l", "min"),
+            route_type_r=("route_type_r", "min"),
         )
 
         # groups must be of same route_type
@@ -803,7 +803,7 @@ class Normalize_functions(object):
             .agg(
                 grproutes=("route_id_r", tuple),
                 grptrips=("trips_r", tuple),
-                trips=("trips_l", min),
+                trips=("trips_l", "min"),
             )
             .reset_index()
         )
