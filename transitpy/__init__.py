@@ -1,20 +1,16 @@
 """Parse, normalize and extract information from one or multiple GTFS files"""
 
-# Add imports here
-# Handle versioneer
-from ._version import get_versions
-from .datasource.PAN import PAN_Datasource
-from .feed import Feed, is_gtfs_path
-from .spatial import match_to_grid, feed_geometries
-from .statistics import (route_stats, stop_stats, transfer_route_stats,
-                         transfer_stop_stats)
-from .transfers import make_transfers
+from transitpy.datasource.PAN import PAN_Datasource as PAN_Datasource
 
-versions = get_versions()
-__version__ = versions['version']
-__git_revision__ = versions['full-revisionid']
-del get_versions, versions
+from transitpy.feed import Feed as Feed
+from transitpy.feed import is_gtfs_path as is_gtfs_path
 
-from . import _version
+from transitpy.spatial import match_to_grid as match_to_grid
+from transitpy.spatial import feed_geometries as feed_geometries
 
-__version__ = _version.get_versions()['version']
+from transitpy.statistics import route_stats as route_stats
+from transitpy.statistics import stop_stats as stop_stats
+from transitpy.statistics import transfer_route_stats as transfer_route_stats
+from transitpy.statistics import transfer_stop_stats as transfer_stop_stats
+
+from transitpy.transfers import make_transfers as make_transfers

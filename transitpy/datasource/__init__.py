@@ -1,0 +1,1 @@
+from transitpy.datasource.PAN import PAN_Datasource as PAN_Datasource
