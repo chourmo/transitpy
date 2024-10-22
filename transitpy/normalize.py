@@ -54,7 +54,7 @@ class Normalize_functions(object):
             self.set_defaults()
 
         # modify route_names
-        self.optimize_route_names(route_name_length=route_name_length)
+        self.unique_route_names(route_name_length=route_name_length)
 
         # ----------------------------
         # normalize stops
@@ -152,7 +152,7 @@ class Normalize_functions(object):
 
         return rids
 
-    def optimize_route_names(self, route_name_length=None):
+    def unique_route_names(self, route_name_length=None):
         """
         if non unique route_short_name and no na in route_long_name,
         replace by route_long_name
@@ -161,6 +161,14 @@ class Normalize_functions(object):
         """
         l = self.routes.shape[0]
         na_longs = len(self.routes.loc[self.routes.route_long_name.isna()])
+
+        # if some text in route long name and non unique long names, make unique
+        if len(self.routes.route_long_name.drop_duplicates()) != l and na_longs == 0:
+            suffix = ' ' + self.routes.groupby('route_long_name').cumcount().add(1).astype('string')
+            suffix.loc[suffix==' 1'] = ''
+            self.routes['route_long_name'] = self.routes['route_long_name'] + suffix
+
+        # if route_short_name non unique and no non na long names
         if len(self.routes.route_short_name.drop_duplicates()) != l and na_longs == 0:
             self.routes.route_short_name = self.routes.route_long_name
 
