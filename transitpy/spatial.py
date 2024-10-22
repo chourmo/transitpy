@@ -26,7 +26,7 @@ def feed_geometries(feed):
     return shapes
 
 def linemerge(gdf):
-    geom = sh.multilinestrings(gdf.values.data, indices=gdf.index.to_numpy())
+    geom = sh.multilinestrings(gdf.array, indices=gdf.index.to_numpy())
     geom = sh.line_merge(geom)
     index = gdf.index.drop_duplicates()
     return gpd.GeoSeries(data=geom, index=index, crs=gdf.crs)
@@ -54,7 +54,7 @@ def linestring_coordinates(geometry, reindex=False):
     else, index is same as geometry index
     """
 
-    coords, coords_index = sh.get_coordinates(geometry.values.data, return_index=True)
+    coords, coords_index = sh.get_coordinates(geometry.array, return_index=True)
     pts = pd.DataFrame(data=coords, index=coords_index, columns=["x", "y"])
 
     if not reindex:
@@ -162,8 +162,8 @@ def query_pairs(
     pairs["distance"] = pairs[geom_l].distance(pairs[[geom_r]].set_geometry(geom_r, crs=points.crs))
 
     if line:
-        pairs["geometry"] = sh.shortest_line(pairs[geom_l].values.data,
-                                             pairs[geom_r].values.data,
+        pairs["geometry"] = sh.shortest_line(pairs[geom_l].array,
+                                             pairs[geom_r].array,
         )
         pairs = pairs.set_geometry("geometry")
 
