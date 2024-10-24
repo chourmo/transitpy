@@ -302,8 +302,19 @@ def transfer_route_stats(transfers, max_text_length=200):
             "group_name_out": "group_name",
         }
     )
-
-    stats = stats.fillna(0)
+    fillcols = {"wait_in":0,
+                "wait_out":0 ,
+                "route_nb_in":0,
+                "route_nb":0,
+                "transfers_in":0,
+                "transfers_out":0,
+                "transf_10_out":0,
+                "transf_20_out":0,
+                "transf_10_in":0,
+                "transf_20_in":0,
+                "agency_nb_in":0,
+                "routye_nb_in":0}
+    stats = stats.fillna(fillcols)
 
     stats["transfers"] = stats["transfers_in"] + stats["transfers_out"]
     stats["wait"] = (stats["wait_in"] + stats["wait_out"]) / 2
